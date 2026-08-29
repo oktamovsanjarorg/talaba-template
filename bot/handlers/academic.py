@@ -52,7 +52,7 @@ async def process_referat_topic(message: types.Message, state: FSMContext):
         await message.answer("⚠️ Mavzu juda qisqa. To'liqroq mavzu kiriting:", reply_markup=get_cancel_keyboard())
         return
 
-    status_msg = await message.answer("⏳ **[1/3]** Mavzu tahlil qilinmoqda va reja tuzilmoqda...")
+    status_msg = await message.answer("⏳ **[1/3]** Mavzu tahlil qilinmoqda va akademik reja tuzilmoqda...")
     try:
         await asyncio.sleep(1)
         await status_msg.edit_text("⏳ **[2/3]** Akademik boblar va ilmiy matn yozilmoqda...")
@@ -69,9 +69,11 @@ async def process_referat_topic(message: types.Message, state: FSMContext):
             student_name=message.from_user.full_name
         )
         
+        await user_service.record_generation(message.from_user.id, "referat", topic, "success")
+
         kb = InlineKeyboardBuilder()
         kb.button(text="📊 Shu mavzuda Slayd yasash", callback_data="btn_slide")
-        kb.button(text="🎯 Mavzu bo'yicha Test tuzish", callback_data="btn_quiz")
+        kb.button(text="🎯 Testlar tuzish", callback_data="btn_quiz")
         kb.button(text="🏠 Asosiy menyu", callback_data="btn_main_menu")
         kb.adjust(1)
 
@@ -91,6 +93,7 @@ async def process_referat_topic(message: types.Message, state: FSMContext):
             os.remove(file_path)
             
     except Exception as e:
+        await user_service.record_generation(message.from_user.id, "referat", topic, "failed")
         await message.answer(f"❌ Xatolik: {str(e)}", reply_markup=get_cancel_keyboard())
     finally:
         try:
@@ -106,7 +109,7 @@ async def start_slide_flow(callback: types.CallbackQuery, state: FSMContext):
     text = (
         "📊 **Taqdimot (PowerPoint Slayd) tayyorlash**\n\n"
         "Iltimos, taqdimot mavzusini kiriting:\n\n"
-        "📌 *Misol:* `Kiberxavfsizlik va axborot himoyasi asoslari`"
+        "📌 *Misol:* `Sun'iy intellekt va axborot xavfsizligi`"
     )
     await callback.message.edit_text(text, reply_markup=get_cancel_keyboard(), parse_mode="Markdown")
     await state.set_state(AcademicStates.waiting_for_slide_topic)
@@ -150,7 +153,8 @@ async def process_slide_count(callback: types.CallbackQuery, state: FSMContext):
         os.makedirs(output_dir, exist_ok=True)
         file_path = f"{output_dir}/slide_{callback.from_user.id}.pptx"
         
-        create_presentation_pptx(slides_data=slides_data, topic=topic, output_path=file_path)
+        create_presentation_pptx(slides_data=slides_data, topic=topic, output_path=file_path, student_name=callback.from_user.full_name)
+        await user_service.record_generation(callback.from_user.id, "slide", topic, "success")
         
         kb = InlineKeyboardBuilder()
         kb.button(text="📝 Shu mavzuda Referat yozish", callback_data="btn_referat")
@@ -160,13 +164,14 @@ async def process_slide_count(callback: types.CallbackQuery, state: FSMContext):
         doc_file = FSInputFile(file_path, filename=f"{topic[:30]}_taqdimot.pptx")
         await callback.message.answer_document(
             doc_file,
-            caption=f"🎉 **Taqdimot tayyor!**\n\n📌 **Mavzu:** *{topic}*\n📊 **Slaydlar:** {len(slides_data)} ta\n🖥 **Format:** PowerPoint (.pptx)",
+            caption=f"🎉 **Taqdimot tayyor!**\n\n📌 **Mavzu:** *{topic}*\n📊 **Slaydlar:** {len(slides_data)} ta\n🖥 **Format:** 16:9 Widescreen (.pptx)",
             reply_markup=kb.as_markup(),
             parse_mode="Markdown"
         )
         if os.path.exists(file_path):
             os.remove(file_path)
     except Exception as e:
+        await user_service.record_generation(callback.from_user.id, "slide", topic, "failed")
         await callback.message.answer(f"❌ Xatolik: {str(e)}", reply_markup=get_cancel_keyboard())
     finally:
         try:
@@ -201,6 +206,7 @@ async def process_mustaqil_topic(message: types.Message, state: FSMContext):
         file_path = f"{output_dir}/mustaqil_{message.from_user.id}.docx"
 
         create_mustaqil_ish_docx(data=data, output_path=file_path, student_name=message.from_user.full_name)
+        await user_service.record_generation(message.from_user.id, "mustaqil", topic, "success")
 
         kb = InlineKeyboardBuilder()
         kb.button(text="🏠 Asosiy menyu", callback_data="btn_main_menu")
@@ -215,6 +221,7 @@ async def process_mustaqil_topic(message: types.Message, state: FSMContext):
         if os.path.exists(file_path):
             os.remove(file_path)
     except Exception as e:
+        await user_service.record_generation(message.from_user.id, "mustaqil", topic, "failed")
         await message.answer(f"❌ Xatolik: {str(e)}", reply_markup=get_cancel_keyboard())
     finally:
         try:
@@ -230,7 +237,7 @@ async def start_quiz_flow(callback: types.CallbackQuery, state: FSMContext):
     text = (
         "🎯 **Test va Nazorat Savollari tuzish**\n\n"
         "Qaysi mavzu yoki fan bo'yicha test savollari tuzilsin?\n\n"
-        "📌 *Misol:* `O'zbekiston tarixi (Eng yangi davr)` yoki `Python dasturlash asoslari`"
+        "📌 *Misol:* `O'zbekiston tarixi` yoki `Python dasturlash asoslari`"
     )
     await callback.message.edit_text(text, reply_markup=get_cancel_keyboard(), parse_mode="Markdown")
     await state.set_state(AcademicStates.waiting_for_quiz_topic)
@@ -249,6 +256,7 @@ async def process_quiz_topic(message: types.Message, state: FSMContext):
         file_path = f"{output_dir}/quiz_{message.from_user.id}.docx"
 
         create_quiz_docx(quiz_data=quiz_data, topic=topic, output_path=file_path)
+        await user_service.record_generation(message.from_user.id, "quiz", topic, "success")
 
         kb = InlineKeyboardBuilder()
         kb.button(text="🎯 Yangi test", callback_data="btn_quiz")
@@ -258,12 +266,11 @@ async def process_quiz_topic(message: types.Message, state: FSMContext):
         doc_file = FSInputFile(file_path, filename=f"{topic[:30]}_testlar.docx")
         await message.answer_document(
             doc_file,
-            caption=f"🎉 **Testlar to'plami tayyor!**\n\n📌 **Mavzu:** *{topic}*\n🎯 **Savollar:** {len(quiz_data)} ta (Javoblar kaliti va izohlari bilan birga).",
+            caption=f"🎉 **Testlar to'plami tayyor!**\n\n📌 **Mavzu:** *{topic}*\n🎯 **Savollar:** {len(quiz_data)} ta (Javoblar kaliti bilan birga).",
             reply_markup=kb.as_markup(),
             parse_mode="Markdown"
         )
 
-        # 1-savolni to'g'ridan-to'g'ri Telegram Quiz tarzida yuborish (Interaktivlik)
         if quiz_data:
             first_q = quiz_data[0]
             await message.answer_poll(
@@ -278,6 +285,7 @@ async def process_quiz_topic(message: types.Message, state: FSMContext):
         if os.path.exists(file_path):
             os.remove(file_path)
     except Exception as e:
+        await user_service.record_generation(message.from_user.id, "quiz", topic, "failed")
         await message.answer(f"❌ Xatolik: {str(e)}", reply_markup=get_cancel_keyboard())
     finally:
         try:
@@ -309,6 +317,8 @@ async def process_summary_text(message: types.Message, state: FSMContext):
     status_msg = await message.answer("⏳ Matn tahlil qilinib, asosiy xulosalar konspekt qilinmoqda...")
     try:
         summary = await ai_service.summarize_text(text)
+        await user_service.record_generation(message.from_user.id, "summary", text[:50], "success")
+
         kb = InlineKeyboardBuilder()
         kb.button(text="🏠 Asosiy menyu", callback_data="btn_main_menu")
 

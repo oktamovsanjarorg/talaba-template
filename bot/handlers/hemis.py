@@ -5,7 +5,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from services.hemis_service import hemis_service
 from services.user_service import user_service
-from services.hemis.universities import UNIVERSITIES, search_university
+from services.hemis.universities import UNIVERSITIES, search_universities, search_university
 
 router = Router()
 

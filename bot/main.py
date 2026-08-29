@@ -5,6 +5,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from core.config import settings
 from core.database import engine, Base
+from services.storage_cleaner import start_storage_cleaner_task
 from bot.handlers.start import router as start_router
 from bot.handlers.academic import router as academic_router
 from bot.handlers.hemis import router as hemis_router
@@ -25,6 +26,9 @@ async def main():
 
     await init_db()
 
+    # Diskni avtomatik tozalovchi fon jarayonini boshlash
+    asyncio.create_task(start_storage_cleaner_task())
+
     bot = Bot(token=settings.BOT_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
 
@@ -32,7 +36,7 @@ async def main():
     dp.include_router(academic_router)
     dp.include_router(hemis_router)
 
-    print("🚀 Talaba AI & HEMIS Bot ishga tushdi...")
+    print("🚀 Talaba AI & HEMIS Monolith MVP muvaffaqiyatli ishga tushdi...")
     await dp.start_polling(bot)
 
 

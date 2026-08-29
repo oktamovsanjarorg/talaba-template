@@ -1,122 +1,180 @@
 import os
 from docx import Document
-from docx.shared import Pt, Inches, RGBColor
+from docx.shared import Pt, Inches, RGBColor, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.section import WD_SECTION_START
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 
 
-def create_referat_docx(data: dict, output_path: str, student_name: str = "Talaba", university: str = "O'zbekiston Milliy Universiteti"):
+def add_page_number(run):
+    """Word hujjati sahifasiga avtomatik sahifa raqami XML elementini kiritish"""
+    fldChar1 = OxmlElement('w:fldChar')
+    fldChar1.set(qn('w:fldCharType'), 'begin')
+    instrText = OxmlElement('w:instrText')
+    instrText.set(qn('xml:space'), 'preserve')
+    instrText.text = "PAGE"
+    fldChar2 = OxmlElement('w:fldChar')
+    fldChar2.set(qn('w:fldCharType'), 'separate')
+    fldChar3 = OxmlElement('w:fldChar')
+    fldChar3.set(qn('w:fldCharType'), 'end')
+
+    r = run._r
+    r.append(fldChar1)
+    r.append(instrText)
+    r.append(fldChar2)
+    r.append(fldChar3)
+
+
+def format_academic_paragraph(p, text: str, font_size=14, bold=False, italic=False, align=WD_ALIGN_PARAGRAPH.JUSTIFY, is_heading=False):
+    """Akademik standartdagi xatboshi (Times New Roman, 1.5 interval, 1.25cm xatboshi)"""
+    p.alignment = align
+    p.paragraph_format.line_spacing = 1.5
+    p.paragraph_format.space_before = Pt(0)
+    p.paragraph_format.space_after = Pt(4 if is_heading else 0)
+    if not is_heading:
+        p.paragraph_format.first_line_indent = Cm(1.25)
+    
+    run = p.add_run(text)
+    run.font.name = 'Times New Roman'
+    run.font.size = Pt(font_size)
+    run.font.color.rgb = RGBColor(0, 0, 0)
+    run.bold = bold
+    run.italic = italic
+    return run
+
+
+def create_referat_docx(data: dict, output_path: str, student_name: str = "Talaba", university: str = "O'zbekiston Milliy Universiteti", faculty: str = "Axborot texnologiyalari fakulteti"):
     """
-    O'zbekiston akademik talablariga mos chiroyli Word referatini yasaydi.
+    O'zbekiston OTM standartlaridagi mukammal akademik Referat (.docx) generatori.
     """
     doc = Document()
 
-    # Chekka masofalari (Margins): Chap 3cm, O'ng 1.5cm, Yuqori/Past 2cm
-    for section in doc.sections:
-        section.top_margin = Inches(0.8)
-        section.bottom_margin = Inches(0.8)
-        section.left_margin = Inches(1.18)
-        section.right_margin = Inches(0.6)
+    # SECTION 1: TITUL VARAG'I (Sahifa raqamisiz)
+    sec_title = doc.sections[0]
+    sec_title.top_margin = Cm(2.0)
+    sec_title.bottom_margin = Cm(2.0)
+    sec_title.left_margin = Cm(3.0)
+    sec_title.right_margin = Cm(1.5)
+    sec_title.different_first_page_header_footer = True
 
-    # 1. TITUL VARAG'I
-    p_ministry = doc.add_paragraph()
-    p_ministry.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p_ministry.add_run("O'ZBEKISTON RESPUBLIKASI OLIY TA'LIM, FAN VA INNOVATSIYALAR VAZIRLIGI\n")
-    run.font.name = 'Times New Roman'
-    run.font.size = Pt(12)
-    run.bold = True
+    # Titul varag'i tarkibi
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = p.add_run("O'ZBEKISTON RESPUBLIKASI\nOLIY TA'LIM, FAN VA INNOVATSIYALAR VAZIRLIGI\n\n")
+    r.font.name = 'Times New Roman'; r.font.size = Pt(12); r.bold = True
 
-    p_univ = doc.add_paragraph()
-    p_univ.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p_univ.add_run(f"{university.upper()}\n\n\n")
-    run.font.name = 'Times New Roman'
-    run.font.size = Pt(13)
-    run.bold = True
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = p.add_run(f"{university.upper()}\n{faculty.upper()}\n\n\n")
+    r.font.name = 'Times New Roman'; r.font.size = Pt(13); r.bold = True
 
-    p_type = doc.add_paragraph()
-    p_type.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p_type.add_run("REFERAT\n\n")
-    run.font.name = 'Times New Roman'
-    run.font.size = Pt(22)
-    run.bold = True
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = p.add_run("REFERAT\n\n")
+    r.font.name = 'Times New Roman'; r.font.size = Pt(22); r.bold = True
 
-    p_theme = doc.add_paragraph()
-    p_theme.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p_theme.add_run(f"Mavzu: \"{data.get('title', 'Mavzu')}\"\n\n\n\n")
-    run.font.name = 'Times New Roman'
-    run.font.size = Pt(14)
-    run.bold = True
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = p.add_run(f"Mavzu: \"{data.get('title', 'Mavzu')}\"\n\n\n\n")
+    r.font.name = 'Times New Roman'; r.font.size = Pt(14); r.bold = True
 
-    p_info = doc.add_paragraph()
-    p_info.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    run = p_info.add_run(f"Bajardi: {student_name}\nQabul qildi: O'qituvchi\n\n\n\n")
-    run.font.name = 'Times New Roman'
-    run.font.size = Pt(13)
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p.paragraph_format.line_spacing = 1.3
+    r = p.add_run(f"Bajardi: {student_name}\nTekshirdi: Ilmiy rahbar / O'qituvchi\n\n\n\n\n")
+    r.font.name = 'Times New Roman'; r.font.size = Pt(13)
 
-    p_city = doc.add_paragraph()
-    p_city.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p_city.add_run("Toshkent — 2026")
-    run.font.name = 'Times New Roman'
-    run.font.size = Pt(12)
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    r = p.add_run("Toshkent — 2026")
+    r.font.name = 'Times New Roman'; r.font.size = Pt(12)
 
-    doc.add_page_break()
+    # SECTION 2: ASOSIY MATN (Sahifa raqamlari bilan)
+    sec_main = doc.add_section(WD_SECTION_START.NEW_PAGE)
+    sec_main.top_margin = Cm(2.0)
+    sec_main.bottom_margin = Cm(2.0)
+    sec_main.left_margin = Cm(3.0)
+    sec_main.right_margin = Cm(1.5)
 
-    # 2. REJA (Mundarija)
+    # Pastki qismda o'rtada sahifa raqami
+    footer = sec_main.footer
+    f_p = footer.paragraphs[0]
+    f_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    f_run = f_p.add_run()
+    f_run.font.name = 'Times New Roman'
+    f_run.font.size = Pt(11)
+    add_page_number(f_run)
+
+    # 1. MUNDARIJA / REJA
     p_plan_title = doc.add_paragraph()
-    p_plan_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p_plan_title.add_run("REJA:\n")
-    run.font.name = 'Times New Roman'
-    run.font.size = Pt(15)
-    run.bold = True
+    format_academic_paragraph(p_plan_title, "MUNDARIJA", font_size=16, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER, is_heading=True)
 
-    for item in data.get('plan', []):
+    page_counter = 3
+    for idx, item in enumerate(data.get('plan', []), 1):
         p_item = doc.add_paragraph()
-        run = p_item.add_run(item)
-        run.font.name = 'Times New Roman'
-        run.font.size = Pt(13)
+        p_item.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        p_item.paragraph_format.line_spacing = 1.3
+        p_item.paragraph_format.space_after = Pt(2)
+        
+        # Nuqtali chiziq formati
+        dots_count = max(5, 55 - len(item))
+        dots = "." * dots_count
+        r_item = p_item.add_run(f"{item} {dots} {page_counter}")
+        r_item.font.name = 'Times New Roman'; r_item.font.size = Pt(13)
+        page_counter += 2
 
     doc.add_page_break()
 
-    def add_section(title: str, content: str):
-        p_h = doc.add_paragraph()
-        p_h.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = p_h.add_run(title.upper())
-        run.font.name = 'Times New Roman'
-        run.font.size = Pt(15)
-        run.bold = True
+    # 2. KIRISH QISMI
+    p_intro_title = doc.add_paragraph()
+    format_academic_paragraph(p_intro_title, "KIRISH", font_size=16, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER, is_heading=True)
 
-        p_c = doc.add_paragraph()
-        p_c.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        p_c.paragraph_format.first_line_indent = Inches(0.5)
-        p_c.paragraph_format.line_spacing = 1.5
-        run = p_c.add_run(content)
-        run.font.name = 'Times New Roman'
-        run.font.size = Pt(14)
-        doc.add_paragraph()
+    intro_text = data.get('introduction', '')
+    for par in intro_text.split("\n\n"):
+        if par.strip():
+            p_par = doc.add_paragraph()
+            format_academic_paragraph(p_par, par.strip(), font_size=14)
 
-    # 3. KIRISH
-    add_section("KIRISH", data.get('introduction', ''))
+    doc.add_page_break()
 
-    # 4. ASOSIY BOBLAR
-    for chapter in data.get('chapters', []):
-        add_section(chapter.get('title', ''), chapter.get('content', ''))
+    # 3. ASOSIY BOBLAR VA BO'LIMLAR
+    for idx, chapter in enumerate(data.get('chapters', []), 1):
+        ch_title = chapter.get('title', f"{idx}-BOB")
+        p_ch = doc.add_paragraph()
+        format_academic_paragraph(p_ch, ch_title.upper(), font_size=15, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER, is_heading=True)
 
-    # 5. XULOSA
-    add_section("XULOSA", data.get('conclusion', ''))
+        content = chapter.get('content', '')
+        for par in content.split("\n\n"):
+            if par.strip():
+                p_par = doc.add_paragraph()
+                format_academic_paragraph(p_par, par.strip(), font_size=14)
+        doc.add_page_break()
 
-    # 6. ADABIYOTLAR RO'YXATI
+    # 4. XULOSA
+    p_concl_title = doc.add_paragraph()
+    format_academic_paragraph(p_concl_title, "XULOSA VA AMALIY TAVSIYALAR", font_size=16, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER, is_heading=True)
+
+    concl_text = data.get('conclusion', '')
+    for par in concl_text.split("\n\n"):
+        if par.strip():
+            p_par = doc.add_paragraph()
+            format_academic_paragraph(p_par, par.strip(), font_size=14)
+
+    doc.add_page_break()
+
+    # 5. FOYDALANILGAN ADABIYOTLAR RO'YXATI
     p_ref_title = doc.add_paragraph()
-    p_ref_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    run = p_ref_title.add_run("FOYDALANILGAN ADABIYOTLAR")
-    run.font.name = 'Times New Roman'
-    run.font.size = Pt(15)
-    run.bold = True
+    format_academic_paragraph(p_ref_title, "FOYDALANILGAN ADABIYOTLAR RO'YXATI", font_size=16, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER, is_heading=True)
 
-    for ref in data.get('references', []):
+    for idx, ref in enumerate(data.get('references', []), 1):
         p_ref = doc.add_paragraph()
-        p_ref.paragraph_format.line_spacing = 1.5
-        run = p_ref.add_run(ref)
-        run.font.name = 'Times New Roman'
-        run.font.size = Pt(13)
+        p_ref.paragraph_format.line_spacing = 1.3
+        p_ref.paragraph_format.space_after = Pt(3)
+        clean_ref = ref if ref.startswith(f"{idx}.") else f"{idx}. {ref}"
+        r_ref = p_ref.add_run(clean_ref)
+        r_ref.font.name = 'Times New Roman'
+        r_ref.font.size = Pt(13)
 
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     doc.save(output_path)
