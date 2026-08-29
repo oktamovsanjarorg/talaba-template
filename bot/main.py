@@ -4,25 +4,38 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from core.config import settings
+from core.database import engine, Base
 from bot.handlers.start import router as start_router
 from bot.handlers.academic import router as academic_router
+from bot.handlers.hemis import router as hemis_router
 
 logging.basicConfig(level=logging.INFO)
 
 
+async def init_db():
+    """Ma'lumotlar bazasida jadvallarni avtomatik yaratish"""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    print("✅ Ma'lumotlar bazasi jadvallari muvaffaqiyatli tekshirildi/yaratildi.")
+
+
 async def main():
     if not settings.BOT_TOKEN or settings.BOT_TOKEN == "YOUR_TELEGRAM_BOT_TOKEN_HERE":
-        print("DIQQAT: .env faylida BOT_TOKEN ko'rsatilmagan! Iltimos @BotFather dan olingan tokenni .env ga qo'ying.")
+        print("DIQQAT: .env faylida BOT_TOKEN ko'rsatilmagan!")
         return
+
+    # 1. Bazani initsializatsiya qilish
+    await init_db()
 
     bot = Bot(token=settings.BOT_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
 
-    # Routerlarni ro'yxatga olish
+    # 2. Routerlarni ro'yxatga olish
     dp.include_router(start_router)
     dp.include_router(academic_router)
+    dp.include_router(hemis_router)
 
-    print("🚀 Talaba AI & HEMIS Bot muvaffaqiyatli ishga tushdi...")
+    print("🚀 Talaba AI & HEMIS Bot barcha modullar bilan ishga tushdi...")
     await dp.start_polling(bot)
 
 
