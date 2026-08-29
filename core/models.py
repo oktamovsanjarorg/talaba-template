@@ -1,7 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, BigInteger, String, Text, Integer, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from core.database import Base
+
+
+def utc_now():
+    return datetime.now(timezone.utc)
 
 
 class User(Base):
@@ -10,8 +14,8 @@ class User(Base):
     id = Column(BigInteger, primary_key=True, index=True)  # Telegram ID
     full_name = Column(String(255), nullable=False)
     username = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    last_active = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+    last_active = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
     # HEMIS ma'lumotlari (Shifrlangan)
     hemis_domain = Column(String(255), nullable=True)
@@ -38,6 +42,6 @@ class GenerationHistory(Base):
     doc_type = Column(String(50), nullable=False)  # referat, slide, mustaqil, quiz, summary
     topic = Column(String(500), nullable=False)
     status = Column(String(50), default="success") # success, failed
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utc_now)
 
     user = relationship("User", back_populates="generations")

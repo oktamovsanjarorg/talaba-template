@@ -1,11 +1,12 @@
 from aiogram import Router, F, types
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from services.hemis_service import hemis_service
 from services.user_service import user_service
-from services.hemis.universities import UNIVERSITIES, search_universities, search_university
+from services.hemis.universities import UNIVERSITIES, search_universities, get_paginated_universities
 
 router = Router()
 
@@ -22,10 +23,13 @@ def get_cancel_kb():
     return kb.as_markup()
 
 
+@router.message(Command("hemis"))
+@router.message(F.text == "🎓 HEMIS")
 @router.callback_query(F.data == "btn_hemis")
-async def handle_hemis_menu(callback: types.CallbackQuery, state: FSMContext):
+async def handle_hemis_menu(event: types.Message | types.CallbackQuery, state: FSMContext):
     await state.clear()
-    creds = await user_service.get_hemis_credentials(callback.from_user.id)
+    user_id = event.from_user.id
+    creds = await user_service.get_hemis_credentials(user_id)
     kb = InlineKeyboardBuilder()
 
     if creds:
@@ -36,40 +40,64 @@ async def handle_hemis_menu(callback: types.CallbackQuery, state: FSMContext):
         kb.adjust(1)
 
         text = (
-            f"🎓 **HEMIS Shaxsiy Kabineti**\n\n"
-            f"👤 Talaba: **{creds.get('name') or 'Noma\'lum'}**\n"
-            f"🏫 OTM: `{creds.get('domain')}`\n"
-            f"👥 Guruh: `{creds.get('group') or 'Aniqlanmagan'}`\n\n"
-            f"Kerakli bo'limni tanlang:"
+            "🎓 **HEMIS Shaxsiy Kabineti**\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"👤 **Talaba:** {creds.get('name') or 'Noma\'lum'}\n"
+            f"🏫 **OTM:** `{creds.get('university') or creds['domain']}`\n"
+            f"👥 **Guruh:** `{creds.get('group') or 'Noma\'lum'}`\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "Kerakli bo'limni tanlang:"
         )
     else:
-        kb.button(text="🔑 HEMIS hisobini ulash", callback_data="hemis_select_univ")
+        kb.button(text="🔑 HEMIS hisobini ulash", callback_data="hemis_page_1")
         kb.button(text="◀️ Asosiy menyu", callback_data="btn_main_menu")
         kb.adjust(1)
 
         text = (
-            "🎓 **HEMIS tizimi ulanmagan**\n\n"
+            "🎓 **HEMIS Axborot Tizimi**\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
             "Dars jadvali, topshiriqlar muddatlari (deadline) va baholaringizni avtomatik "
             "kuzatib borish uchun HEMIS profilingizni botga ulang.\n\n"
-            "🔒 *Parol va ma'lumotlaringiz AES-256 algoritmi orqali shifrlanadi.*"
+            "🔒 *Xavfsizlik kafolati: Parol va ma'lumotlaringiz AES-256 algoritmi orqali shifrlanadi.*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━"
         )
 
-    await callback.message.edit_text(text, reply_markup=kb.as_markup(), parse_mode="Markdown")
-    await callback.answer()
+    if isinstance(event, types.CallbackQuery):
+        await event.message.edit_text(text, reply_markup=kb.as_markup(), parse_mode="Markdown")
+        await event.answer()
+    else:
+        await event.answer(text, reply_markup=kb.as_markup(), parse_mode="Markdown")
 
 
-# 1. OTMNI TANLASH VA AVTORIZATSIYA
-@router.callback_query(F.data == "hemis_select_univ")
-async def show_universities_selection(callback: types.CallbackQuery, state: FSMContext):
+# OTMNI TANLASH (PAGINATION BILAN)
+@router.callback_query(F.data.startswith("hemis_page_"))
+async def show_universities_paginated(callback: types.CallbackQuery, state: FSMContext):
+    page = int(callback.data.split("_")[-1])
+    items, current_page, total_pages = get_paginated_universities(page=page, page_size=6)
+
     kb = InlineKeyboardBuilder()
-    for u in UNIVERSITIES[:6]:
-        kb.button(text=f"🏛 {u['short'].upper()}", callback_data=f"set_univ_{u['domain']}")
+    for u in items:
+        kb.button(text=f"🏛 {u['short'].upper()} ({u['region']})", callback_data=f"set_univ_{u['domain']}")
     
-    kb.button(text="🔍 Boshqa OTMni qidirish / Yozish", callback_data="hemis_search_univ")
-    kb.button(text="◀️ Orqaga", callback_data="btn_hemis")
-    kb.adjust(2, 2, 2, 1, 1)
+    kb.adjust(2, 2, 2)
 
-    text = "🏫 **Oliygohingizni (OTM) tanlang:**\n\nRo'yxatdan o'z universitetingizni tanlang yoki qidiruvdan foydalaning:"
+    # Navigatsiya (Oldingi / Keyingi)
+    nav_buttons = []
+    if current_page > 1:
+        nav_buttons.append(types.InlineKeyboardButton(text="⬅️ Oldingi", callback_data=f"hemis_page_{current_page - 1}"))
+    if current_page < total_pages:
+        nav_buttons.append(types.InlineKeyboardButton(text="Keyingi ➡️", callback_data=f"hemis_page_{current_page + 1}"))
+    if nav_buttons:
+        kb.row(*nav_buttons)
+
+    kb.row(types.InlineKeyboardButton(text="🔍 OTMni qidirish / Yozish", callback_data="hemis_search_univ"))
+    kb.row(types.InlineKeyboardButton(text="◀️ Orqaga", callback_data="btn_hemis"))
+
+    text = (
+        f"🏫 **Oliygohingizni (OTM) tanlang** (Sahifa {current_page}/{total_pages}):\n"
+        "━━━━━━━━━━━━━━━━━━━━━━\n"
+        "Ro'yxatdan o'z universitetingizni tanlang yoki qidiruvdan foydalaning:"
+    )
     await callback.message.edit_text(text, reply_markup=kb.as_markup(), parse_mode="Markdown")
     await callback.answer()
 
@@ -80,9 +108,10 @@ async def select_university_direct(callback: types.CallbackQuery, state: FSMCont
     await state.update_data(domain=domain)
     
     await callback.message.answer(
-        f"🏛 Tanlangan OTM: `{domain}`\n\n"
+        f"🏛 **Tanlangan OTM:** `{domain}`\n\n"
         f"👤 HEMIS **Talaba ID (Login)**ingizni kiriting:",
-        reply_markup=get_cancel_kb()
+        reply_markup=get_cancel_kb(),
+        parse_mode="Markdown"
     )
     await state.set_state(HemisAuthStates.waiting_for_login)
     await callback.answer()
@@ -91,8 +120,10 @@ async def select_university_direct(callback: types.CallbackQuery, state: FSMCont
 @router.callback_query(F.data == "hemis_search_univ")
 async def ask_university_search(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.answer(
-        "🔍 Universitetingiz nomini yoki domenini yozing:\n*(Masalan: `Samarqand`, `tuit`, yoki `student.nuu.uz`)*",
-        reply_markup=get_cancel_kb()
+        "🔍 **Universitetingiz nomini yoki domenini yozing:**\n\n"
+        "*(Masalan: `Samarqand`, `tuit`, yoki `student.nuu.uz`)*",
+        reply_markup=get_cancel_kb(),
+        parse_mode="Markdown"
     )
     await state.set_state(HemisAuthStates.waiting_for_domain_search)
     await callback.answer()
@@ -101,19 +132,18 @@ async def ask_university_search(callback: types.CallbackQuery, state: FSMContext
 @router.message(HemisAuthStates.waiting_for_domain_search)
 async def process_domain_search(message: types.Message, state: FSMContext):
     query = message.text.strip()
-    found = search_university(query)
+    found = search_universities(query, limit=6)
     
     if found:
         kb = InlineKeyboardBuilder()
         for u in found:
-            kb.button(text=u['name'][:30], callback_data=f"set_univ_{u['domain']}")
+            kb.button(text=f"🏛 {u['short'].upper()} - {u['name'][:25]}", callback_data=f"set_univ_{u['domain']}")
         kb.button(text="❌ Bekor qilish", callback_data="btn_hemis")
         kb.adjust(1)
-        await message.answer("Topilgan OTMlar ro'yxati:", reply_markup=kb.as_markup())
+        await message.answer("🔍 **Topilgan OTMlar ro'yxati:**", reply_markup=kb.as_markup(), parse_mode="Markdown")
     else:
-        # To'g'ridan-to'g'ri domen deb qabul qilish
         await state.update_data(domain=query)
-        await message.answer(f"Domen: `{query}`\n\n👤 HEMIS **Talaba ID** (Login)ingizni kiriting:", reply_markup=get_cancel_kb())
+        await message.answer(f"Domen: `{query}`\n\n👤 HEMIS **Talaba ID (Login)**ingizni kiriting:", reply_markup=get_cancel_kb())
         await state.set_state(HemisAuthStates.waiting_for_login)
 
 
@@ -121,7 +151,11 @@ async def process_domain_search(message: types.Message, state: FSMContext):
 async def process_login(message: types.Message, state: FSMContext):
     login_id = message.text.strip()
     await state.update_data(login_id=login_id)
-    await message.answer("🔒 HEMIS **parolingizni** kiriting:\n*(Xabaringiz xavfsizlik uchun darhol o'chiriladi)*", reply_markup=get_cancel_kb())
+    await message.answer(
+        "🔒 HEMIS **parolingizni** kiriting:\n\n"
+        "*(🔒 Xavfsizlik: Ushbu xabaringiz tizim tomonidan darhol o'chirib yuboriladi)*",
+        reply_markup=get_cancel_kb()
+    )
     await state.set_state(HemisAuthStates.waiting_for_password)
 
 
@@ -145,18 +179,23 @@ async def process_password(message: types.Message, state: FSMContext):
         await user_service.link_hemis(message.from_user.id, domain, token, info)
         kb = InlineKeyboardBuilder()
         kb.button(text="🎓 HEMIS Kabinetiga o'tish", callback_data="btn_hemis")
-        await wait_msg.edit_text("✅ **HEMIS hisobingiz muvaffaqiyatli ulandi!**", reply_markup=kb.as_markup())
+        await wait_msg.edit_text("✅ **HEMIS hisobingiz muvaffaqiyatli ulandi!**", reply_markup=kb.as_markup(), parse_mode="Markdown")
     else:
         kb = InlineKeyboardBuilder()
-        kb.button(text="🔄 Qayta urinish", callback_data="hemis_select_univ")
+        kb.button(text="🔄 Qayta urinish", callback_data="hemis_page_1")
         kb.button(text="🏠 Asosiy menyu", callback_data="btn_main_menu")
         kb.adjust(1)
-        await wait_msg.edit_text("❌ **Kirish muvaffaqiyatsiz bo'ldi.**\nLogin, parol yoki OTM domeni noto'g'ri kiritildi.", reply_markup=kb.as_markup())
+        await wait_msg.edit_text(
+            "❌ **Kirish muvaffaqiyatsiz bo'ldi.**\n"
+            "Login, parol yoki OTM domeni noto'g'ri kiritildi. Qaytadan urinib ko'ring.",
+            reply_markup=kb.as_markup(),
+            parse_mode="Markdown"
+        )
 
     await state.clear()
 
 
-# 2. DARS JADVALI
+# DARS JADVALI
 @router.callback_query(F.data == "hemis_schedule")
 async def show_schedule(callback: types.CallbackQuery):
     creds = await user_service.get_hemis_credentials(callback.from_user.id)
@@ -169,12 +208,13 @@ async def show_schedule(callback: types.CallbackQuery):
     await wait_msg.delete()
 
     if schedule:
-        lines = ["📅 **Dars Jadvali:**\n"]
+        lines = ["📅 **Dars Jadvali:**\n━━━━━━━━━━━━━━━━━━━━━━\n"]
         for item in schedule[:8]:
             subject = item.get("subject", {}).get("name") if isinstance(item.get("subject"), dict) else str(item.get("subject", "Fan"))
             lesson_pair = item.get("lessonPair", {}).get("name") if isinstance(item.get("lessonPair"), dict) else str(item.get("lessonPair", "Vaqt"))
             auditorium = item.get("auditorium", {}).get("name") if isinstance(item.get("auditorium"), dict) else str(item.get("auditorium", "Xona"))
             lines.append(f"⏱ *{lesson_pair}* | **{subject}** ({auditorium})")
+        lines.append("━━━━━━━━━━━━━━━━━━━━━━")
         text = "\n".join(lines)
     else:
         text = "📅 Hozirgi kunda jadval bo'sh yoki yuklab bo'lmadi."
@@ -185,7 +225,7 @@ async def show_schedule(callback: types.CallbackQuery):
     await callback.answer()
 
 
-# 3. TOPSHIRIQLAR & DEADLINE
+# TOPSHIRIQLAR & DEADLINE
 @router.callback_query(F.data == "hemis_tasks")
 async def show_tasks(callback: types.CallbackQuery):
     creds = await user_service.get_hemis_credentials(callback.from_user.id)
@@ -198,11 +238,12 @@ async def show_tasks(callback: types.CallbackQuery):
     await wait_msg.delete()
 
     if tasks:
-        lines = ["⏳ **Topshiriqlar va Deadline muddatlari:**\n"]
+        lines = ["⏳ **Topshiriqlar va Deadline muddatlari:**\n━━━━━━━━━━━━━━━━━━━━━━\n"]
         for t in tasks[:6]:
             name = t.get("name") or t.get("task", {}).get("name") or "Topshiriq"
             deadline = t.get("deadline") or "Belgilanmagan"
             lines.append(f"📌 **{name}**\n🗓 Deadline: `{deadline}`\n")
+        lines.append("━━━━━━━━━━━━━━━━━━━━━━")
         text = "\n".join(lines)
     else:
         text = "✅ Faol topshiriqlar yoki deadlinelar mavjud emas!"
@@ -213,11 +254,11 @@ async def show_tasks(callback: types.CallbackQuery):
     await callback.answer()
 
 
-# 4. HISOBDAN CHIQISH (LOGOUT)
+# LOGOUT
 @router.callback_query(F.data == "hemis_logout")
 async def process_logout(callback: types.CallbackQuery):
     await user_service.link_hemis(callback.from_user.id, "", "", None)
     kb = InlineKeyboardBuilder()
     kb.button(text="🏠 Asosiy menyu", callback_data="btn_main_menu")
-    await callback.message.edit_text("🚪 **HEMIS hisobingizdan muvaffaqiyatli chiqdingiz.**", reply_markup=kb.as_markup())
+    await callback.message.edit_text("🚪 **HEMIS hisobingizdan muvaffaqiyatli chiqdingiz.**", reply_markup=kb.as_markup(), parse_mode="Markdown")
     await callback.answer()

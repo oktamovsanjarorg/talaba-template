@@ -1,8 +1,12 @@
-from datetime import datetime
-from sqlalchemy import select, update
+from datetime import datetime, timezone
+from sqlalchemy import select
 from core.database import AsyncSessionLocal
 from core.models import User, GenerationHistory
 from core.security import encrypt_data, decrypt_data
+
+
+def get_now():
+    return datetime.now(timezone.utc)
 
 
 class UserService:
@@ -17,14 +21,14 @@ class UserService:
                     id=telegram_id,
                     full_name=full_name,
                     username=username,
-                    created_at=datetime.utcnow(),
-                    last_active=datetime.utcnow()
+                    created_at=get_now(),
+                    last_active=get_now()
                 )
                 session.add(user)
                 await session.commit()
                 await session.refresh(user)
             else:
-                user.last_active = datetime.utcnow()
+                user.last_active = get_now()
                 if full_name:
                     user.full_name = full_name
                 if username:
@@ -90,7 +94,8 @@ class UserService:
                     user_id=telegram_id,
                     doc_type=doc_type,
                     topic=topic[:490],
-                    status=status
+                    status=status,
+                    created_at=get_now()
                 )
                 session.add(history)
                 await session.commit()
