@@ -1,0 +1,20 @@
+groups:
+  - name: talaba_alerts
+    rules:
+      - alert: HighAiErrorRate
+        expr: rate(talaba_referats_generated_total{status="failed"}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "AI xizmati xatolik qaytarmoqda"
+          description: "Oxirgi 5 daqiqada referat generatsiyasining 10% dan ortig'i muvaffaqiyatsiz bo'ldi."
+
+      - alert: HighAiLatency
+        expr: histogram_quantile(0.95, sum(rate(talaba_ai_request_latency_seconds_bucket[5m])) by (le)) > 20
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "AI generatsiya tezligi sekinlashdi"
+          description: "So'rovlarning 95 foizi 20 soniyadan ko'proq vaqt olmoqda."

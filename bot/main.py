@@ -13,10 +13,9 @@ logging.basicConfig(level=logging.INFO)
 
 
 async def init_db():
-    """Ma'lumotlar bazasida jadvallarni avtomatik yaratish"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    print("✅ Ma'lumotlar bazasi jadvallari muvaffaqiyatli tekshirildi/yaratildi.")
+    print("✅ Ma'lumotlar bazasi jadvallari tayyor.")
 
 
 async def main():
@@ -24,18 +23,16 @@ async def main():
         print("DIQQAT: .env faylida BOT_TOKEN ko'rsatilmagan!")
         return
 
-    # 1. Bazani initsializatsiya qilish
     await init_db()
 
     bot = Bot(token=settings.BOT_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
 
-    # 2. Routerlarni ro'yxatga olish
     dp.include_router(start_router)
     dp.include_router(academic_router)
     dp.include_router(hemis_router)
 
-    print("🚀 Talaba AI & HEMIS Bot barcha modullar bilan ishga tushdi...")
+    print("🚀 Talaba AI & HEMIS Bot ishga tushdi...")
     await dp.start_polling(bot)
 
 

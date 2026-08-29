@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: talaba-bot
+  namespace: talaba
+  labels:
+    app: talaba-bot
+    tier: frontend
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: talaba-bot
+  template:
+    metadata:
+      labels:
+        app: talaba-bot
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+    spec:
+      containers:
+        - name: bot
+          image: ghcr.io/oktamovsanjar/talaba-bot:latest
+          imagePullPolicy: Always
+          command: ["python", "apps/bot/main.py"]
+          envFrom:
+            - configMapRef:
+                name: talaba-global-config
+            - secretRef:
+                name: talaba-secrets
+          ports:
+            - containerPort: 8000
+              name: metrics
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
