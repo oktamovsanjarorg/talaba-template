@@ -43,7 +43,7 @@ def test_docx_referat_creation(tmp_path):
     out_file = str(tmp_path / "test_referat.docx")
     res = create_referat_docx(data, out_file, student_name="Sanjar O'ktamov")
     assert os.path.exists(res)
-    assert os.path.getsize(res) > 2000 # To'liq hujjat hajmi
+    assert os.path.getsize(res) > 2000
 
 
 def test_pptx_creation(tmp_path):
@@ -88,7 +88,7 @@ def test_quiz_creation(tmp_path):
     assert os.path.getsize(res) > 2000
 
 
-def test_ai_service_clean_json():
-    raw = "```json\n{\"test\": 123}\n```"
-    cleaned = ai_service._clean_json_response(raw)
-    assert cleaned == "{\"test\": 123}"
+def test_ai_service_extract_json():
+    raw = "```json\n{\"title\": \"AI Test\"}\n```"
+    parsed = ai_service._extract_and_parse_json(raw, {})
+    assert parsed.get("title") == "AI Test"
