@@ -5,9 +5,10 @@ from core.config import settings
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=False,
-    pool_size=20,
-    max_overflow=10,
-    pool_pre_ping=True
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
+    pool_pre_ping=True,
+    pool_recycle=3600,  # Har soatda ulanishlarni yangilash
 )
 
 AsyncSessionLocal = async_sessionmaker(
@@ -17,6 +18,7 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 Base = declarative_base()
+
 
 async def get_db():
     async with AsyncSessionLocal() as session:

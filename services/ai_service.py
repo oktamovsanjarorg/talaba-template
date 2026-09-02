@@ -1,4 +1,5 @@
 import json
+import asyncio
 import re
 import logging
 from openai import AsyncOpenAI
@@ -15,6 +16,31 @@ class AIService:
             timeout=45.0
         )
         self.model = settings.QWEN_MODEL
+
+
+    async def _call_ai_with_retry(self, messages: list, temperature: float = 0.6, use_json: bool = True, max_retries: int = 2) -> str:
+        """AI modeliga so'rov yuborish (retry bilan)"""
+        last_error = None
+        for attempt in range(max_retries + 1):
+            try:
+                kwargs = {
+                    "model": self.model,
+                    "messages": messages,
+                    "temperature": temperature,
+                }
+                if use_json:
+                    kwargs["response_format"] = {"type": "json_object"}
+                response = await self.client.chat.completions.create(**kwargs)
+                return response.choices[0].message.content
+            except Exception as e:
+                last_error = e
+                if attempt < max_retries:
+                    wait_time = (attempt + 1) * 2  # 2s, 4s
+                    logger.warning(f"AI so'rov xatosi (urinish {attempt + 1}/{max_retries + 1}): {e}. {wait_time}s kutilmoqda...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"AI so'rov yakuniy xatosi: {e}")
+                    raise last_error
 
     def _extract_and_parse_json(self, content: str, default_data: dict) -> dict:
         content = content.strip()
@@ -129,16 +155,13 @@ Quyidagi JSON formatda to'liq referat matnini tayyorlab ber:
         }
 
         try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
+            raw = await self._call_ai_with_retry(
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                response_format={"type": "json_object"},
                 temperature=0.6
             )
-            raw = response.choices[0].message.content
             return self._extract_and_parse_json(raw, default_data)
         except Exception as e:
             logger.error(f"Referat generatsiya xatosi: {e}")
@@ -171,16 +194,14 @@ Quyidagi JSON formatda to'liq referat matnini tayyorlab ber:
         ]
 
         try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
+            raw = await self._call_ai_with_retry(
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                response_format={"type": "json_object"},
                 temperature=0.6
             )
-            data = self._extract_and_parse_json(response.choices[0].message.content, {"slides": default_slides})
+            data = self._extract_and_parse_json(raw, {"slides": default_slides})
             return data.get("slides", default_slides)
         except Exception as e:
             logger.error(f"Slayd xatosi: {e}")
@@ -210,16 +231,14 @@ JSON format:
             "references": ["1. Sohaviy darsliklar to'plami."]
         }
         try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
+            raw = await self._call_ai_with_retry(
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                response_format={"type": "json_object"},
                 temperature=0.6
             )
-            return self._extract_and_parse_json(response.choices[0].message.content, default_data)
+            return self._extract_and_parse_json(raw, default_data)
         except Exception as e:
             logger.error(f"Mustaqil ish xatosi: {e}")
             return default_data
@@ -236,16 +255,14 @@ JSON format:
             }
         ]
         try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
+            raw = await self._call_ai_with_retry(
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                response_format={"type": "json_object"},
                 temperature=0.5
             )
-            data = self._extract_and_parse_json(response.choices[0].message.content, {"quizzes": default_quizzes})
+            data = self._extract_and_parse_json(raw, {"quizzes": default_quizzes})
             return data.get("quizzes", default_quizzes)
         except Exception as e:
             logger.error(f"Quiz xatosi: {e}")
@@ -254,15 +271,15 @@ JSON format:
     async def summarize_text(self, text: str) -> str:
         system_prompt = "Sen talabalar uchun konspekt tayyorlovchi professional mutaxassissan. Matnni asosiy sarlavhalar, ta'riflar, qoidalar va xulosalarga bo'lib, tartibli konspekt qil."
         try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
+            raw = await self._call_ai_with_retry(
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"Matn:\n{text[:4000]}"}
+                    {"role": "user", "content": f"Matn:\n{text[:6000]}"}
                 ],
-                temperature=0.5
+                temperature=0.5,
+                use_json=False
             )
-            return response.choices[0].message.content.strip()
+            return raw.strip()
         except Exception as e:
             return f"Matn konspekti: {text[:200]}..."
 

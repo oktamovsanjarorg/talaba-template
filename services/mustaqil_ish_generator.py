@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from docx import Document
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -53,7 +54,7 @@ def create_mustaqil_ish_docx(data: dict, output_path: str, student_name: str = "
 
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r = p.add_run("Toshkent — 2026")
+    r = p.add_run(f"Toshkent — {datetime.now().year}")
     r.font.name = 'Times New Roman'
     r.font.size = Pt(12)
 

@@ -1,42 +1,36 @@
-# 🎓 Talaba AI & HEMIS Assistant (Production Monolith MVP)
+# 🎓 Talaba AI & HEMIS Assistant
 
-Talabalar uchun sun'iy intellekt (Alibaba Cloud Qwen AI) va HEMIS axborot tizimi bilan to'liq integratsiyalashgan, zamonaviy akademik yordamchi ekotizim.
+Talabalar uchun sun'iy intellekt (Alibaba Cloud Qwen AI) va HEMIS axborot tizimi bilan integratsiyalashgan akademik yordamchi Telegram bot.
 
 ---
 
-## 🌟 Asosiy Imkoniyatlar (Features)
+## 🌟 Asosiy Imkoniyatlar
 
-### 1. 📝 Akademik Referat Generator (DOCX)
-* O'zbekiston OTMlarining rasmiy talablariga 100% mos format:
-  * **Shrift:** Times New Roman 14pt, 1.5 qator oralig'i (line spacing);
-  * **Hoshiyalar (Margins):** Chap 3sm, O'ng 1.5sm, Yuqori/Past 2sm;
-  * **Struktura:** Rasmiy Titul varag'i (Vazirlik, OTM, Kafedra, Talaba, Toshkent 2026), Reja/Mundarija, Kirish, 3 ta asosiy bob, Xulosa va Foydalanilgan adabiyotlar ro'yxati.
+### 📝 Akademik Referat Generator (DOCX)
+* O'zbekiston OTMlarining rasmiy talablariga mos format
+* Times New Roman 14pt, 1.5 qator oralig'i
+* Titul varag'i, Mundarija, 3 bob, Xulosa va Adabiyotlar
 
-### 2. 📊 Taqdimot & Slayd Generator (PPTX)
-* Zamonaviy 16:9 Widescreen PowerPoint taqdimotlari;
-* 5 ta, 8 ta yoki 10 ta slayd tanlash imkoniyati;
-* Asosiy sarlavhalar va qisqa, ta'sirchan tezislar (bullet points).
+### 📊 Taqdimot Generator (PPTX)
+* 16:9 Widescreen PowerPoint taqdimotlar
+* 5, 8, yoki 10 slayd tanlash imkoniyati
+* Zamonaviy card-grid dizayn
 
-### 3. 📑 Mustaqil Ta'lim Ishi Generator (DOCX)
-* OTM mustaqil ta'lim talablari bo'yicha:
-  * Topshiriqning maqsadi va vazifalari;
-  * Nazariy qism;
-  * Amaliy tahlil va yondashuv;
-  * Xulosa va adabiyotlar.
+### 📑 Mustaqil Ta'lim Ishi Generator (DOCX)
+* Maqsad, Nazariy qism, Amaliy tahlil, Xulosa
 
-### 4. 🎯 Testlar va Nazorat Savollari (Quiz)
-* Mavzu bo'yicha 4 variantli (A, B, C, D) testlar to'plami;
-* Chop etishga tayyor Word (.docx) varianti (Alohida sahifada **Javoblar kaliti va ilmiy izohlari** bilan);
-* Telegram ichida to'g'ridan-to'g'ri yechish uchun **Interaktiv Telegram Quiz (Poll)** rejimi.
+### 🎯 Test va Nazorat Savollari (Quiz)
+* 4 variantli testlar to'plami (DOCX)
+* Javoblar kaliti va ilmiy izohlar
+* Telegram Quiz (Poll) rejimi
 
-### 5. 💡 Aqlli Konspekt & Xulosachi
-* Katta leksiyalar, maqolalar yoki darslik matnlarini tahlil qilib, eng muhim qoidalarni punktlar ko'rinishida chiqarib beradi.
+### 💡 Aqlli Konspekt
+* Katta matnlardan asosiy xulosalarni chiqarish
 
-### 6. 🎓 HEMIS To'liq Integratsiyasi
-* O'zbekistondagi 18+ asosiy OTMlar (TATU, O'zMU, SamDU, TDIU, TDTU va boshqalar) ro'yxatdan tanlash yoki qidirish;
-* Haftalik va kunlik **Dars jadvali**;
-* **Topshiriqlar va Yakunlanish Muddatlari (Deadline)**;
-* **Xavfsizlik:** Talaba tokenlari bazada **AES-256** kriptografik algoritmi bilan shifrlanadi.
+### 🎓 HEMIS Integratsiyasi
+* 50+ O'zbekiston OTMlari bilan ishlash
+* Dars jadvali va topshiriqlar/deadline
+* Token shifrlash (Fernet/AES)
 
 ---
 
@@ -49,39 +43,91 @@ talaba/
 │   │   ├── start.py        # Asosiy menyu, Profil va Yordam
 │   │   ├── academic.py     # Referat, Slayd, Mustaqil ish, Quiz, Konspekt
 │   │   └── hemis.py        # OTM qidiruvi, Login, Dars jadvali, Topshiriqlar
+│   ├── commands.py         # Telegram buyruqlar menyusi
 │   └── main.py             # Aiogram 3 bot kirish nuqtasi
 ├── core/
 │   ├── config.py           # Pydantic sozlamalari
 │   ├── database.py         # SQLAlchemy + Asyncpg (PostgreSQL)
-│   ├── models.py           # ORM Foydalanuvchi jadvallari
-│   └── security.py         # AES-256 shifrlash / de-shifrlash
+│   ├── models.py           # ORM modellari
+│   ├── security.py         # Fernet shifrlash / deshifrlash
+│   └── telemetry.py        # Prometheus metrikalari
 ├── services/
-│   ├── ai_service.py       # Alibaba Cloud Qwen AI mijoz
+│   ├── ai_service.py       # Qwen AI mijoz (retry bilan)
 │   ├── docx_generator.py   # Referat Word generatori
-│   ├── pptx_generator.py   # PowerPoint taqdimot generatori
-│   ├── mustaqil_ish_generator.py # Mustaqil ish Word generatori
-│   ├── quiz_generator.py   # Testlar va javoblar kaliti generatori
+│   ├── pptx_generator.py   # PowerPoint generatori
+│   ├── mustaqil_ish_generator.py
+│   ├── quiz_generator.py   # Testlar generatori
+│   ├── hemis_service.py    # HEMIS API mijoz
+│   ├── user_service.py     # Foydalanuvchi CRUD
+│   ├── storage_cleaner.py  # Vaqtinchalik fayllarni tozalash
 │   └── hemis/
-│       └── universities.py # O'zbekiston OTMlari ma'lumotlar bazasi
+│       └── universities.py # O'zbekiston OTMlari bazasi
+├── apps/
+│   └── workers/
+│       ├── celery_app.py   # Celery konfiguratsiyasi
+│       └── tasks.py        # Fon vazifalari
 ├── tests/
-│   └── test_core.py        # Avtomatlashtirilgan Pytest to'plami
+│   ├── conftest.py         # Test fixture'lar
+│   ├── test_core.py        # Unit testlar
+│   ├── test_e2e.py         # E2E testlar
+│   └── test_ai_service.py  # AI service testlar
 ├── docker/
-│   └── Dockerfile          # Non-root xavfsiz konteyner
-├── docker-compose.yml      # Bot, PostgreSQL 16 va Redis 7
+│   └── Dockerfile
+├── infra/
+│   ├── k8s/                # Kubernetes manifest'lar
+│   ├── monitoring/         # Prometheus konfiguratsiyasi
+│   └── terraform/          # IaC konfiguratsiyasi
+├── docker-compose.yml      # Bot, Worker, PostgreSQL, Redis
 └── requirements.txt
 ```
 
 ---
 
-## 🚀 Ishga tushirish va Testlash
+## 🚀 Ishga tushirish
 
+### 1. Environment sozlash
 ```bash
-# 1. Konteynerlarni ko'tarish
-docker compose up -d --build
-
-# 2. Avtomatlashtirilgan testlarni yurgizish
-docker compose exec bot pytest tests/ -v
-
-# 3. Loglarni kuzatish
-docker compose logs -f bot
+cp .env.example .env
+# .env faylini to'ldiring: BOT_TOKEN, QWEN_API_KEY, ENCRYPTION_KEY
 ```
+
+### 2. Docker bilan ishga tushirish
+```bash
+docker compose up -d --build
+```
+
+Bu quyidagilarni ko'taradi:
+- **bot** — Telegram bot (Aiogram 3 + Redis FSM)
+- **worker** — Celery fon ishlari
+- **db** — PostgreSQL 16
+- **redis** — Redis 7 (FSM + Celery broker)
+
+### 3. Testlarni yurgizish
+```bash
+# Lokal
+pytest tests/test_core.py tests/test_ai_service.py -v
+
+# Docker ichida
+docker compose exec bot pytest tests/test_core.py -v
+```
+
+### 4. Loglarni kuzatish
+```bash
+docker compose logs -f bot worker
+```
+
+---
+
+## 📋 Texnologiyalar
+
+| Texnologiya | Versiya | Maqsad |
+|---|---|---|
+| Python | 3.12 | Asosiy til |
+| Aiogram | 3.14+ | Telegram Bot Framework |
+| SQLAlchemy | 2.0+ | ORM (PostgreSQL) |
+| Redis | 7 | FSM Storage + Celery Broker |
+| Celery | 5.4+ | Background Tasks |
+| Qwen AI | turbo | Matn generatsiyasi |
+| python-docx | 1.1+ | Word hujjat generatsiyasi |
+| python-pptx | 1.0+ | PowerPoint generatsiyasi |
+| Prometheus | - | Monitoring metrikalari |

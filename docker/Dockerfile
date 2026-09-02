@@ -20,7 +20,7 @@ COPY . .
 RUN useradd -m -u 1000 appuser && \
     mkdir -p /app/storage/referats /app/storage/slides /app/storage/mustaqil /app/storage/quizzes && \
     chown -R appuser:appuser /app && \
-    chmod -R 777 /app/storage
+    chmod -R 770 /app/storage
 
 USER appuser
 

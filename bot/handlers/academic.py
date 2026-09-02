@@ -1,5 +1,7 @@
 import os
+import uuid
 import asyncio
+import logging
 from aiogram import Router, F, types, Bot
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -14,6 +16,7 @@ from services.mustaqil_ish_generator import create_mustaqil_ish_docx
 from services.quiz_generator import create_quiz_docx
 from services.user_service import user_service
 
+logger = logging.getLogger(__name__)
 router = Router()
 
 
@@ -84,7 +87,7 @@ async def execute_referat_generation(message: types.Message, topic: str, state: 
         await status_msg.edit_text("⏳ **[3/3]** Rasmiy Titul varag'i va Word (.docx) standarti shakllantirilmoqda...", parse_mode="Markdown")
         output_dir = "/app/storage/referats"
         os.makedirs(output_dir, exist_ok=True)
-        file_path = f"{output_dir}/referat_{message.from_user.id}.docx"
+        file_path = f"{output_dir}/referat_{message.from_user.id}_{uuid.uuid4().hex[:8]}.docx"
         
         create_referat_docx(
             data=data,
@@ -119,7 +122,8 @@ async def execute_referat_generation(message: types.Message, topic: str, state: 
             
     except Exception as e:
         await user_service.record_generation(message.from_user.id, "referat", topic, "failed")
-        await message.answer(f"❌ Xatolik yuz berdi: {str(e)}\nQaytadan urinib ko'ring:", reply_markup=get_cancel_keyboard())
+        logger.error(f"Xatolik: {e}")
+        await message.answer("❌ Xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.", reply_markup=get_cancel_keyboard())
     finally:
         try:
             await status_msg.delete()
@@ -138,7 +142,8 @@ async def start_slide_flow(event: types.Message | types.CallbackQuery, state: FS
     
     # Auto slide trigger
     if isinstance(event, types.CallbackQuery) and event.data.startswith("auto_slide_"):
-        topic = event.data.replace("auto_slide_", "").strip()
+        data = await state.get_data()
+        topic = data.get("smart_topic") or event.data.replace("auto_slide_", "").strip()
         await state.update_data(slide_topic=topic)
         await show_slide_count_options(event.message, topic, state)
         await event.answer()
@@ -204,7 +209,7 @@ async def process_slide_count(callback: types.CallbackQuery, state: FSMContext):
         
         output_dir = "/app/storage/slides"
         os.makedirs(output_dir, exist_ok=True)
-        file_path = f"{output_dir}/slide_{callback.from_user.id}.pptx"
+        file_path = f"{output_dir}/slide_{callback.from_user.id}_{uuid.uuid4().hex[:8]}.pptx"
         
         create_presentation_pptx(slides_data=slides_data, topic=topic, output_path=file_path, student_name=callback.from_user.full_name)
         await user_service.record_generation(callback.from_user.id, "slide", topic, "success")
@@ -232,7 +237,8 @@ async def process_slide_count(callback: types.CallbackQuery, state: FSMContext):
             os.remove(file_path)
     except Exception as e:
         await user_service.record_generation(callback.from_user.id, "slide", topic, "failed")
-        await callback.message.answer(f"❌ Xatolik: {str(e)}", reply_markup=get_cancel_keyboard())
+        logger.error(f"Xatolik: {e}")
+        await callback.message.answer("❌ Xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.", reply_markup=get_cancel_keyboard())
     finally:
         try:
             await status_msg.delete()
@@ -280,7 +286,7 @@ async def execute_mustaqil_generation(message: types.Message, topic: str, state:
         data = await ai_service.generate_mustaqil_ish_structure(topic=topic)
         output_dir = "/app/storage/mustaqil"
         os.makedirs(output_dir, exist_ok=True)
-        file_path = f"{output_dir}/mustaqil_{message.from_user.id}.docx"
+        file_path = f"{output_dir}/mustaqil_{message.from_user.id}_{uuid.uuid4().hex[:8]}.docx"
 
         create_mustaqil_ish_docx(data=data, output_path=file_path, student_name=message.from_user.full_name)
         await user_service.record_generation(message.from_user.id, "mustaqil", topic, "success")
@@ -306,7 +312,8 @@ async def execute_mustaqil_generation(message: types.Message, topic: str, state:
             os.remove(file_path)
     except Exception as e:
         await user_service.record_generation(message.from_user.id, "mustaqil", topic, "failed")
-        await message.answer(f"❌ Xatolik: {str(e)}", reply_markup=get_cancel_keyboard())
+        logger.error(f"Xatolik: {e}")
+        await message.answer("❌ Xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.", reply_markup=get_cancel_keyboard())
     finally:
         try:
             await status_msg.delete()
@@ -324,7 +331,8 @@ async def start_quiz_flow(event: types.Message | types.CallbackQuery, state: FSM
     await state.clear()
     
     if isinstance(event, types.CallbackQuery) and event.data.startswith("auto_quiz_"):
-        topic = event.data.replace("auto_quiz_", "").strip()
+        data = await state.get_data()
+        topic = data.get("smart_topic") or event.data.replace("auto_quiz_", "").strip()
         await execute_quiz_generation(event.message, topic, state)
         await event.answer()
         return
@@ -361,7 +369,7 @@ async def execute_quiz_generation(message: types.Message, topic: str, state: FSM
         quiz_data = await ai_service.generate_quiz_data(topic=topic, count=6)
         output_dir = "/app/storage/quizzes"
         os.makedirs(output_dir, exist_ok=True)
-        file_path = f"{output_dir}/quiz_{message.from_user.id}.docx"
+        file_path = f"{output_dir}/quiz_{message.from_user.id}_{uuid.uuid4().hex[:8]}.docx"
 
         create_quiz_docx(quiz_data=quiz_data, topic=topic, output_path=file_path)
         await user_service.record_generation(message.from_user.id, "quiz", topic, "success")
@@ -407,7 +415,8 @@ async def execute_quiz_generation(message: types.Message, topic: str, state: FSM
             os.remove(file_path)
     except Exception as e:
         await user_service.record_generation(message.from_user.id, "quiz", topic, "failed")
-        await message.answer(f"❌ Xatolik: {str(e)}", reply_markup=get_cancel_keyboard())
+        logger.error(f"Xatolik: {e}")
+        await message.answer("❌ Xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.", reply_markup=get_cancel_keyboard())
     finally:
         try:
             await status_msg.delete()
@@ -460,7 +469,8 @@ async def process_summary_text(message: types.Message, state: FSMContext):
             parse_mode="Markdown"
         )
     except Exception as e:
-        await message.answer(f"❌ Xatolik: {str(e)}", reply_markup=get_cancel_keyboard())
+        logger.error(f"Xatolik: {e}")
+        await message.answer("❌ Xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.", reply_markup=get_cancel_keyboard())
     finally:
         try:
             await status_msg.delete()
@@ -481,10 +491,11 @@ async def handle_general_text_input(message: types.Message, state: FSMContext):
         return
 
     kb = InlineKeyboardBuilder()
-    kb.button(text="📝 Referat (Word)", callback_data=f"smart_ref_{topic[:25]}")
-    kb.button(text="📊 Taqdimot (PPTX)", callback_data=f"auto_slide_{topic[:25]}")
-    kb.button(text="📑 Mustaqil ish (Word)", callback_data=f"smart_mst_{topic[:25]}")
-    kb.button(text="🎯 Testlar (Quiz)", callback_data=f"auto_quiz_{topic[:25]}")
+    await state.update_data(smart_topic=topic)
+    kb.button(text="📝 Referat (Word)", callback_data="smart_ref")
+    kb.button(text="📊 Taqdimot (PPTX)", callback_data=f"auto_slide_{topic[:50]}")
+    kb.button(text="📑 Mustaqil ish (Word)", callback_data="smart_mst")
+    kb.button(text="🎯 Testlar (Quiz)", callback_data=f"auto_quiz_{topic[:50]}")
     kb.adjust(2, 2)
 
     await message.answer(
@@ -496,15 +507,17 @@ async def handle_general_text_input(message: types.Message, state: FSMContext):
     )
 
 
-@router.callback_query(F.data.startswith("smart_ref_"))
+@router.callback_query(F.data.startswith("smart_ref"))
 async def process_smart_referat(callback: types.CallbackQuery, state: FSMContext):
-    topic = callback.data.replace("smart_ref_", "").strip()
+    data = await state.get_data()
+    topic = data.get("smart_topic") or callback.data.replace("smart_ref_", "").strip()
     await execute_referat_generation(callback.message, topic, state)
     await callback.answer()
 
 
-@router.callback_query(F.data.startswith("smart_mst_"))
+@router.callback_query(F.data.startswith("smart_mst"))
 async def process_smart_mustaqil(callback: types.CallbackQuery, state: FSMContext):
-    topic = callback.data.replace("smart_mst_", "").strip()
+    data = await state.get_data()
+    topic = data.get("smart_topic") or callback.data.replace("smart_mst_", "").strip()
     await execute_mustaqil_generation(callback.message, topic, state)
     await callback.answer()

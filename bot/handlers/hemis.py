@@ -143,7 +143,7 @@ async def process_domain_search(message: types.Message, state: FSMContext):
         await message.answer("🔍 **Topilgan OTMlar ro'yxati:**", reply_markup=kb.as_markup(), parse_mode="Markdown")
     else:
         await state.update_data(domain=query)
-        await message.answer(f"Domen: `{query}`\n\n👤 HEMIS **Talaba ID (Login)**ingizni kiriting:", reply_markup=get_cancel_kb())
+        await message.answer(f"Domen: `{query}`\n\n👤 HEMIS **Talaba ID (Login)**ingizni kiriting:", reply_markup=get_cancel_kb(), parse_mode="Markdown")
         await state.set_state(HemisAuthStates.waiting_for_login)
 
 

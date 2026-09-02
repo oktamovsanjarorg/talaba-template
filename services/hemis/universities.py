@@ -99,4 +99,3 @@ def get_paginated_universities(page: int = 1, page_size: int = 6):
     items = UNIVERSITIES[start:end]
     total_pages = (total + page_size - 1) // page_size
     return items, page, total_pages
-search_university = search_universities

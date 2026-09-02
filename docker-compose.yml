@@ -14,7 +14,26 @@ services:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
+    networks:
+      - talaba_network
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: talaba_worker
+    restart: unless-stopped
+    command: ["celery", "-A", "apps.workers.celery_app", "worker", "--loglevel=info", "--concurrency=2"]
+    env_file:
+      - .env
+    volumes:
+      - ./storage:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - talaba_network
 
@@ -22,9 +41,14 @@ services:
     image: redis:7-alpine
     container_name: talaba_redis
     restart: unless-stopped
-    command: redis-server --save 60 1 --loglevel warning
+    command: redis-server --save 60 1 --loglevel warning --requirepass ${REDIS_PASSWORD:-talaba_redis_pass}
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-talaba_redis_pass}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     networks:
       - talaba_network
 

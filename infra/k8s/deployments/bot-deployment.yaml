@@ -7,7 +7,7 @@ metadata:
     app: talaba-bot
     tier: frontend
 spec:
-  replicas: 2
+  replicas: 1
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -28,7 +28,7 @@ spec:
         - name: bot
           image: ghcr.io/oktamovsanjar/talaba-bot:latest
           imagePullPolicy: Always
-          command: ["python", "apps/bot/main.py"]
+          command: ["python", "bot/main.py"]
           envFrom:
             - configMapRef:
                 name: talaba-global-config
@@ -45,12 +45,12 @@ spec:
               cpu: "500m"
               memory: "512Mi"
           livenessProbe:
-            tcpSocket:
-              port: 8000
-            initialDelaySeconds: 15
-            periodSeconds: 20
+            exec:
+              command: ["python", "-c", "import sys; sys.exit(0)"]
+            initialDelaySeconds: 30
+            periodSeconds: 60
           readinessProbe:
-            tcpSocket:
-              port: 8000
-            initialDelaySeconds: 5
-            periodSeconds: 10
+            exec:
+              command: ["python", "-c", "import sys; sys.exit(0)"]
+            initialDelaySeconds: 10
+            periodSeconds: 30

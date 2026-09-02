@@ -18,10 +18,8 @@ def generate_referat_task(user_id: int, topic: str, student_name: str = "Talaba"
     logger.info(f"🚀 Referat generatsiyasi boshlandi: User={user_id}, Mavzu={topic}")
     
     # Asinxron kodni sinxron Celery ichida yurgizish
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     try:
-        data = loop.run_until_complete(ai_service.generate_referat_structure(topic=topic))
+        data = asyncio.run(ai_service.generate_referat_structure(topic=topic))
         
         output_dir = "/app/storage/referats"
         os.makedirs(output_dir, exist_ok=True)
@@ -39,8 +37,6 @@ def generate_referat_task(user_id: int, topic: str, student_name: str = "Talaba"
         REFERATS_GENERATED.labels(status="failed").inc()
         logger.error(f"Referat generatsiya xatosi: {e}")
         return {"status": "error", "error": str(e)}
-    finally:
-        loop.close()
 
 
 @celery_app.task(name="apps.workers.tasks.generate_slides_task")
@@ -49,10 +45,8 @@ def generate_slides_task(user_id: int, topic: str, slide_count: int = 6):
     Fon ishchisi: Slaydlar uchun AI ga so'rov va PPTX fayl yasash
     """
     logger.info(f"📊 Slayd generatsiyasi boshlandi: User={user_id}, Mavzu={topic}")
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     try:
-        slides_data = loop.run_until_complete(ai_service.generate_slides_data(topic=topic, slide_count=slide_count))
+        slides_data = asyncio.run(ai_service.generate_slides_data(topic=topic, slide_count=slide_count))
         
         output_dir = "/app/storage/slides"
         os.makedirs(output_dir, exist_ok=True)
@@ -70,8 +64,6 @@ def generate_slides_task(user_id: int, topic: str, slide_count: int = 6):
         SLIDES_GENERATED.labels(status="failed").inc()
         logger.error(f"Slayd generatsiya xatosi: {e}")
         return {"status": "error", "error": str(e)}
-    finally:
-        loop.close()
 
 
 @celery_app.task(name="apps.workers.tasks.check_all_hemis_deadlines")
